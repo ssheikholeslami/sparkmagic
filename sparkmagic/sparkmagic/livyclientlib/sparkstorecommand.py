@@ -70,11 +70,11 @@ class SparkStoreCommand(Command):
         else:
             command = u'{}.collect()'.format(command)
         # Unicode support has improved in Python 3 so we don't need to encode.
-        if encode_result:
-            print_command = '{}.encode("{}")'.format(constants.LONG_RANDOM_VARIABLE_NAME,
-                                                     conf.pyspark_dataframe_encoding())
-        else:
-            print_command = constants.LONG_RANDOM_VARIABLE_NAME
+        #if encode_result:
+        #    print_command = '{}.encode("{}")'.format(constants.LONG_RANDOM_VARIABLE_NAME,
+        #                                             conf.pyspark_dataframe_encoding())
+        #else:
+        print_command = constants.LONG_RANDOM_VARIABLE_NAME
         command = u'for {} in {}: print({})'.format(constants.LONG_RANDOM_VARIABLE_NAME,
                                                     command,
                                                     print_command)
