@@ -335,7 +335,7 @@ class LivySession(ObjectWithGuid):
             connection = util._get_http_connection(https=True)
             resource_url = constants.DELIMITERS.SLASH_DELIMITER + \
                            constants.REST_CONFIG.HOPSWORKS_REST_RESOURCE + constants.DELIMITERS.SLASH_DELIMITER + \
-                           "maggy" + constants.DELIMITERS.SLASH_DELIMITER + "getDriver" +
+                           "maggy" + constants.DELIMITERS.SLASH_DELIMITER + "getDriver"
             constants.DELIMITERS.SLASH_DELIMITER + \
                 response = util.send_request(connection, method, resource_url)
             resp_body = response.read()
