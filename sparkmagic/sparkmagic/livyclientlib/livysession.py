@@ -14,6 +14,12 @@ from .command import Command
 from .exceptions import LivyClientTimeoutException, \
     LivyUnexpectedStatusException, BadUserDataException, SqlContextNotFoundException
 
+import os
+from hops import constants
+from hops import tls
+from hops import util
+from hops import hdfs
+import json
 
 class _HeartbeatThread(threading.Thread):
     def __init__(self, livy_session, refresh_seconds, retry_seconds, run_at_most=None):
@@ -98,6 +104,10 @@ class LivySession(ObjectWithGuid):
         self.kind = kind
         self.id = session_id
         self.session_info = u""
+
+        self._maggy_ip = None
+        self._maggy_port = None
+        self._maggy_secret = None
         
         self._heartbeat_thread = None
         if session_id == -1:
@@ -288,6 +298,7 @@ class LivySession(ObjectWithGuid):
             
             self._heartbeat_thread.daemon = True
             self._heartbeat_thread.start()
+            self._heartbeat_maggy_logs()            
 
     def _stop_heartbeat_thread(self):
         if self._heartbeat_thread is not None:
@@ -307,3 +318,129 @@ class LivySession(ObjectWithGuid):
             return u"""<a target="_blank" href="{1}">{0}</a>""".format(text, url)
         else:
             return u""
+
+
+    def _heartbeat_maggy_logs():
+        """
+        Gets the Maggy Driver for Spark Driver, if it exists.
+        {
+          "app_id" : "xxsdfsd",
+          "host_ip" : "192.168.0.1",
+          "port" : 12345,
+          "secret" : "someKey"
+        }
+        """
+        try:
+            method = constants.HTTP_CONFIG.HTTP_GET
+            connection = util._get_http_connection(https=True)
+            resource_url = constants.DELIMITERS.SLASH_DELIMITER + \
+                           constants.REST_CONFIG.HOPSWORKS_REST_RESOURCE + constants.DELIMITERS.SLASH_DELIMITER + \
+                           "maggy" + constants.DELIMITERS.SLASH_DELIMITER + "getDriver" +
+            constants.DELIMITERS.SLASH_DELIMITER + \
+                response = util.send_request(connection, method, resource_url)
+            resp_body = response.read()
+            resp = json.loads(resp_body)
+
+            # Reset values to 'None' if empty string returned
+            self._maggy_ip = resp[u"host_ip"]
+            self._maggy_port = resp[u"port"]
+            self._maggy_secret = resp[u"secret"]
+            self._hb_interval = 1
+            
+            server_addr = (self._maggy_ip, self._maggy_port)
+            client = Client(server_addr, self._hb_interval, self.ipython_display)
+            client.start_heartbeat()
+        except error as e:
+                print("Socket error: {}".format(e))
+        finally:
+            if client != None:
+                client.stop()
+                client.close()
+        
+
+class Client(MessageSocket):
+    """Client to register and await log events
+
+    Args:
+        :server_addr: a tuple of (host, port) pointing to the Server.
+    """
+    def __init__(self, server_addr, hb_interval, ipython_display):
+        # socket for heartbeat thread
+        self.hb_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.hb_sock.connect(server_addr)
+        self.server_addr = server_addr
+        self.done = False
+        self.hb_interval = hb_interval
+        self.ipython_display = ipython_display        
+
+    def _request(self, req_sock, msg_data=None):
+        """Helper function to wrap msg w/ msg_type."""
+        msg = {}
+        msg['type'] = "LOG"
+
+        if msg_data or ((msg_data == True) or (msg_data == False)):
+            msg['data'] = msg_data
+
+        done = False
+        tries = 0
+        while not done and tries < MAX_RETRIES:
+            try:
+                MessageSocket.send(self, req_sock, msg)
+                done = True
+            except socket.error as e:
+                tries += 1
+                if tries >= MAX_RETRIES:
+                    raise
+                print("Socket error: {}".format(e))
+                req_sock.close()
+                req_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                req_sock.connect(self.server_addr)
+
+        resp = MessageSocket.receive(self, req_sock)
+
+        return resp
+
+    def close(self):
+        """Close the client's sockets."""
+        self.hb_sock.close()
+
+    def start_heartbeat(self):
+
+        def _heartbeat(self):
+
+            while not self.done:
+
+                resp = self._request(self.hb_sock,'LOG')
+                _ = self._handle_message(resp)
+
+                # sleep one second
+                time.sleep(self.hb_interval)
+
+        t = threading.Thread(target=_heartbeat, args=(self))
+        t.daemon = True
+        t.start()
+
+        print("Started log heartbeat")
+
+    def stop(self):
+        """Stop the Clients's heartbeat thread."""
+        self.done = True
+
+    def _handle_message(self, msg):
+        """
+        Handles a  message dictionary. Expects a 'type' and 'data' attribute in
+        the message dictionary.
+
+        Args:
+            sock:
+            msg:
+
+        Returns:
+
+        """
+        msg_type = msg['type']
+        if msg_type == 'LOG':
+            data = msg['data']
+            self.ipython_display.writeln(data)                
+#            self.ipython_display.html(html)
+        return
