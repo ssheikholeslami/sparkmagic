@@ -20,6 +20,9 @@ from hops import tls
 #from hops import util
 from hops import hdfs
 import json
+import pickle
+import socket
+import struct
 
 class _HeartbeatThread(threading.Thread):
     def __init__(self, livy_session, refresh_seconds, retry_seconds, run_at_most=None):
@@ -334,13 +337,6 @@ class LivySession(ObjectWithGuid):
             return host_port_pair
         
     def _get_http_connection(https=False):
-    """
-        Opens a HTTP(S) connection to Hopsworks
-        Args:
-        https: boolean flag whether to use Secure HTTP or regular HTTP
-        Returns:
-        HTTP(S)Connection
-    """
         host_port_pair = _get_host_port_pair()
         if (https):
             PROTOCOL = ssl.PROTOCOL_TLSv1_2
@@ -387,6 +383,48 @@ class LivySession(ObjectWithGuid):
                 client.stop()
                 client.close()
         
+
+class MessageSocket(object):
+    """Abstract class w/ length-prefixed socket send/receive functions."""
+
+    def receive(self, sock):
+        """
+        Receive a message on ``sock``
+        Args:
+            sock:
+        Returns:
+        """
+        msg = None
+        data = b''
+        recv_done = False
+        recv_len = -1
+        while not recv_done:
+            buf = sock.recv(BUFSIZE)
+            if buf is None or len(buf) == 0:
+                raise Exception("socket closed")
+            if recv_len == -1:
+                recv_len = struct.unpack('>I', buf[:4])[0]
+                data += buf[4:]
+                recv_len -= len(data)
+            else:
+                data += buf
+                recv_len -= len(buf)
+            recv_done = (recv_len == 0)
+
+        msg = pickle.loads(data)
+        return msg
+
+    def send(self, sock, msg):
+        """
+        Send ``msg`` to destination ``sock``.
+        Args:
+            sock:
+            msg:
+        Returns:
+        """
+        data = pickle.dumps(msg)
+        buf = struct.pack('>I', len(data)) + data
+        sock.sendall(buf)
 
 class Client(MessageSocket):
     """Client to register and await log events
