@@ -16,6 +16,7 @@ from .exceptions import LivyClientTimeoutException, \
 
 import os
 #from hops import constants
+from hops import constants as hopster
 from hops import tls
 #from hops import util
 from hops import hdfs
@@ -150,6 +151,8 @@ class LivySession(ObjectWithGuid):
 
             command = Command("spark")
             (success, out) = command.execute(self)
+
+            self._heartbeat_maggy_logs()                
 
             if success:
                 self.ipython_display.writeln(u"SparkSession available as 'spark'.")
@@ -301,7 +304,6 @@ class LivySession(ObjectWithGuid):
             
             self._heartbeat_thread.daemon = True
             self._heartbeat_thread.start()
-            self._heartbeat_maggy_logs()            
 
     def _stop_heartbeat_thread(self):
         if self._heartbeat_thread is not None:
@@ -324,7 +326,7 @@ class LivySession(ObjectWithGuid):
 
 
     def _get_hopsworks_rest_endpoint():
-        elastic_endpoint = os.environ[hops.constants.ENV_VARIABLES.REST_ENDPOINT_END_VAR]
+        elastic_endpoint = os.environ[hopster.ENV_VARIABLES.REST_ENDPOINT_END_VAR]
         return elastic_endpoint
 
             
@@ -345,8 +347,24 @@ class LivySession(ObjectWithGuid):
         else:
             connection = http.HTTPConnection(str(host_port_pair[0]), int(host_port_pair[1]))
             return connection
+
+    def _get_jwt():
+        with open(hopster.REST_CONFIG.JWT_TOKEN, "r") as jwt:
+            return jwt.read()
         
-    def _heartbeat_maggy_logs():
+    def _send_request(connection, method, resource, body=None, headers=None):
+        if headers is None:
+            headers = {}
+            headers[hopster.HTTP_CONFIG.HTTP_AUTHORIZATION] = "Bearer " + _get_jwt()
+            connection.request(method, resource, body, headers)
+            response = connection.getresponse()
+        if response.status == hopster.HTTP_CONFIG.HTTP_UNAUTHORIZED:
+            headers[hopster.HTTP_CONFIG.HTTP_AUTHORIZATION] = "Bearer " + _get_jwt()
+            connection.request(method, resource, body, headers)
+            response = connection.getresponse()
+        return response
+
+    def _heartbeat_maggy_logs(self):
         """
         Gets the Maggy Driver for Spark Driver, if it exists.
         {
@@ -356,14 +374,22 @@ class LivySession(ObjectWithGuid):
           "secret" : "someKey"
         }
         """
+        self.ipython_display.writeln(u"Asking Hopsworks")        
         try:
-            method = hops.constants.HTTP_CONFIG.HTTP_GET
+
+            method = hopster.HTTP_CONFIG.HTTP_GET
+            self.ipython_display.writeln(u"Got Method")
+            resource_url = hopster.DELIMITERS.SLASH_DELIMITER + \
+                           hopster.REST_CONFIG.HOPSWORKS_REST_RESOURCE + hopster.DELIMITERS.SLASH_DELIMITER + \
+                           "maggy" + hopster.DELIMITERS.SLASH_DELIMITER + "getDriver" + \
+                           hopster.DELIMITERS.SLASH_DELIMITER + self.get_app_id() 
+            self.ipython_display.writeln(u"got url")
+            self.ipython_display.writeln(resource_url)            
+            endpoint = os.environ[hopster.ENV_VARIABLES.REST_ENDPOINT_END_VAR]            
+            self.ipython_display.writeln(endpoint)            
             connection = _get_http_connection(https=True)
-            resource_url = hops.constants.DELIMITERS.SLASH_DELIMITER + \
-                           hops.constants.REST_CONFIG.HOPSWORKS_REST_RESOURCE + hops.constants.DELIMITERS.SLASH_DELIMITER + \
-                           "maggy" + hops.constants.DELIMITERS.SLASH_DELIMITER + "getDriver" + \
-                           hops.constants.DELIMITERS.SLASH_DELIMITER + get_app_id() 
-#            response = util.send_request(connection, method, resource_url)
+            self.ipython_display.writeln(u"got connection")            
+            response = _send_request(connection, method, resource_url)
             resp_body = response.read()
             resp = json.loads(resp_body)
 
@@ -372,16 +398,19 @@ class LivySession(ObjectWithGuid):
             self._maggy_port = resp[u"port"]
             self._maggy_secret = resp[u"secret"]
             self._hb_interval = 1
+            with open("maggy.conf","w") as f:
+                f.write(resp)
             
-            server_addr = (self._maggy_ip, self._maggy_port)
-            client = Client(server_addr, self._hb_interval, self.ipython_display)
-            client.start_heartbeat()
-        except error as e:
-                print("Socket error: {}".format(e))
-        finally:
-            if client != None:
-                client.stop()
-                client.close()
+#            server_addr = (self._maggy_ip, self._maggy_port)
+#            client = Client(server_addr, self._hb_interval, self.ipython_display)
+#            client.start_heartbeat()
+        except:
+            self.ipython_display.writeln("Hopsworks not home...")        
+#            print("Socket error: {}".format(e))
+#        finally:
+#            if client != None:
+#                client.stop()
+#                client.close()
         
 
 class MessageSocket(object):
@@ -440,7 +469,8 @@ class Client(MessageSocket):
         self.done = False
         self.hb_interval = hb_interval
         self.ipython_display = ipython_display        
-
+        self.ipython_display.writeln("Starting Maggy Client")
+            
     def _request(self, req_sock, msg_data=None):
         """Helper function to wrap msg w/ msg_type."""
         msg = {}
