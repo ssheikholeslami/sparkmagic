@@ -15,9 +15,9 @@ from .exceptions import LivyClientTimeoutException, \
     LivyUnexpectedStatusException, BadUserDataException, SqlContextNotFoundException
 
 import os
-from hops import constants
+#from hops import constants
 from hops import tls
-from hops import util
+#from hops import util
 from hops import hdfs
 import json
 
@@ -320,6 +320,36 @@ class LivySession(ObjectWithGuid):
             return u""
 
 
+    def _get_hopsworks_rest_endpoint():
+        elastic_endpoint = os.environ[hops.constants.ENV_VARIABLES.REST_ENDPOINT_END_VAR]
+        return elastic_endpoint
+
+            
+    def _get_host_port_pair():
+        endpoint = _get_hopsworks_rest_endpoint()
+        if 'http' in endpoint:
+            last_index = endpoint.rfind('/')
+            endpoint = endpoint[last_index + 1:]
+            host_port_pair = endpoint.split(':')
+            return host_port_pair
+        
+    def _get_http_connection(https=False):
+    """
+        Opens a HTTP(S) connection to Hopsworks
+        Args:
+        https: boolean flag whether to use Secure HTTP or regular HTTP
+        Returns:
+        HTTP(S)Connection
+    """
+        host_port_pair = _get_host_port_pair()
+        if (https):
+            PROTOCOL = ssl.PROTOCOL_TLSv1_2
+            ssl_context = ssl.SSLContext(PROTOCOL)
+            connection = http.HTTPSConnection(str(host_port_pair[0]), int(host_port_pair[1]), context = ssl_context)
+        else:
+            connection = http.HTTPConnection(str(host_port_pair[0]), int(host_port_pair[1]))
+            return connection
+        
     def _heartbeat_maggy_logs():
         """
         Gets the Maggy Driver for Spark Driver, if it exists.
@@ -331,13 +361,13 @@ class LivySession(ObjectWithGuid):
         }
         """
         try:
-            method = constants.HTTP_CONFIG.HTTP_GET
-            connection = util._get_http_connection(https=True)
-            resource_url = constants.DELIMITERS.SLASH_DELIMITER + \
-                           constants.REST_CONFIG.HOPSWORKS_REST_RESOURCE + constants.DELIMITERS.SLASH_DELIMITER + \
-                           "maggy" + constants.DELIMITERS.SLASH_DELIMITER + "getDriver"
-            constants.DELIMITERS.SLASH_DELIMITER + \
-                response = util.send_request(connection, method, resource_url)
+            method = hops.constants.HTTP_CONFIG.HTTP_GET
+            connection = _get_http_connection(https=True)
+            resource_url = hops.constants.DELIMITERS.SLASH_DELIMITER + \
+                           hops.constants.REST_CONFIG.HOPSWORKS_REST_RESOURCE + hops.constants.DELIMITERS.SLASH_DELIMITER + \
+                           "maggy" + hops.constants.DELIMITERS.SLASH_DELIMITER + "getDriver" + \
+                           hops.constants.DELIMITERS.SLASH_DELIMITER + get_app_id() 
+#            response = util.send_request(connection, method, resource_url)
             resp_body = response.read()
             resp = json.loads(resp_body)
 
