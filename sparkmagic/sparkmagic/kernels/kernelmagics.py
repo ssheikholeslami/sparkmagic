@@ -120,7 +120,7 @@ class KernelMagics(SparkMagicBase):
   </tr>
   <tr>
     <td>sql</td>
-    <td>%%sql -o tables -q<br/>SHOW TABLES</td>
+    <td>%%sql -o tables -q<br/>SINA SHOW TABLES</td>
     <td>Executes a SQL query against the variable sqlContext (Spark v1.x) or spark (Spark v2.x).
     Parameters:
       <ul>
