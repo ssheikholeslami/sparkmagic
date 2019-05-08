@@ -306,6 +306,12 @@ class KernelMagics(SparkMagicBase):
                                             u"in this session will be lost.")
 
     @cell_magic
+    def maggy(self, line, cell="", local_ns=None):
+        """ Placeholder magic to indicate the cell containing
+        maggy.experiment.launch() """
+        pass
+
+    @cell_magic
     def _do_not_call_start_session(self, line, cell="", local_ns=None):
         # Starts a session unless session is already created or a fatal error occurred. Returns True when session is
         # created successfully.
