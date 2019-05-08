@@ -309,7 +309,7 @@ class KernelMagics(SparkMagicBase):
     def maggy(self, line, cell="", local_ns=None):
         """ Placeholder magic to indicate the cell containing
         maggy.experiment.launch() """
-        pass
+        return cell
 
     @cell_magic
     def _do_not_call_start_session(self, line, cell="", local_ns=None):
