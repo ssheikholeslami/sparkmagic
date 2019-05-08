@@ -120,7 +120,7 @@ class KernelMagics(SparkMagicBase):
   </tr>
   <tr>
     <td>sql</td>
-    <td>%%sql -o tables -q<br/>SINA SHOW TABLES</td>
+    <td>%%sql -o tables -q<br/>SHOW TABLES</td>
     <td>Executes a SQL query against the variable sqlContext (Spark v1.x) or spark (Spark v2.x).
     Parameters:
       <ul>
@@ -139,8 +139,8 @@ class KernelMagics(SparkMagicBase):
   <tr>
     <td>maggy</td>
     <td>%%maggy</td>
-    <td>Optional magic for a cell containing `maggy.experiment.launch()`, to show the progress as the cell output.
-    At most one cell in your notebook may contain this magic.</td>
+    <td>Optional magic for a cell containing `maggy.experiment.launch()`,
+    to show the progress as the cell output. At most one cell in your notebook may contain this magic.</td>
   </tr>
 </table>
 """
