@@ -136,6 +136,12 @@ class KernelMagics(SparkMagicBase):
     <td>%%local<br/>a = 1</td>
     <td>All the code in subsequent lines will be executed locally. Code must be valid Python code.</td>
   </tr>
+  <tr>
+    <td>maggy</td>
+    <td>%%maggy</td>
+    <td>Optional magic for a cell containing `maggy.experiment.launch()`, to show the progress as the cell output.
+    At most one cell in your notebook may contain this magic.</td>
+  </tr>
 </table>
 """
         self.ipython_display.html(help_html)
